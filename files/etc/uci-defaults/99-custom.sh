@@ -3,16 +3,19 @@
 # Log file for debugging
 LOGFILE="/etc/config/uci-defaults-log.txt"
 echo "Starting 99-custom.sh at $(date)" >>$LOGFILE
-# 设置默认防火墙规则，方便单网口虚拟机首次访问 WebUI 
-# 因为本项目中 单网口模式是dhcp模式 直接就能上网并且访问web界面 避免新手每次都要修改/etc/config/network中的静态ip
-# 当你刷机运行后 都调整好了 你完全可以在web页面自行关闭 wan口防火墙的入站数据
-# 具体操作方法：网络——防火墙 在wan的入站数据 下拉选项里选择 拒绝 保存并应用即可。
-uci set firewall.@zone[1].input='ACCEPT'
-
-# 设置主机名映射，解决安卓原生 TV 无法联网的问题
+# 设置主机名映射
 uci add dhcp domain
-uci set "dhcp.@domain[-1].name=time.android.com"
-uci set "dhcp.@domain[-1].ip=203.107.6.88"
+uci set "dhcp.@domain[-1].name=api.curseforge.com"
+uci set "dhcp.@domain[-1].ip=3.173.219.112"
+uci add dhcp domain
+uci set "dhcp.@domain[-1].name=edge.forgecdn.net"
+uci set "dhcp.@domain[-1].ip=3.173.219.112"
+uci add dhcp domain
+uci set "dhcp.@domain[-1].name=media.forgecdn.net"
+uci set "dhcp.@domain[-1].ip=3.173.219.112"
+uci add dhcp domain
+uci set "dhcp.@domain[-1].name=mediafilez.forgecdn.net"
+uci set "dhcp.@domain[-1].ip=3.173.219.112"
 
 # 检查配置文件pppoe-settings是否存在 该文件由build.sh动态生成
 SETTINGS_FILE="/etc/config/pppoe-settings"
@@ -127,93 +130,57 @@ elif [ "$count" -gt 1 ]; then
     uci commit network
 fi
 
-# 设置所有网口可访问网页终端
-uci delete ttyd.@ttyd[0].interface
+# 1. 取消 Fullcone NAT
+uci set firewall.@defaults[0].fullcone='0'
 
-# 设置所有网口可连接 SSH
-uci set dropbear.@dropbear[0].Interface=''
+# 2. 修改 Allow-Ping (IPv4 入站)
+idx=$(uci show firewall | grep "name='Allow-Ping'" | cut -d'[' -f2 | cut -d']' -f1)
+[ -n "$idx" ] && uci set firewall.@rule[$idx].target='DROP'
+
+# 3. 完美剔除 Allow-ICMPv6-Forward 中的 echo-request
+idx=$(uci show firewall | grep "name='Allow-ICMPv6-Forward'" | cut -d'[' -f2 | cut -d']' -f1)
+if [ -n "$idx" ]; then
+    uci del_list firewall.@rule[$idx].icmp_type='echo-request'
+fi
+
+# 4. 创建 Block Cloudflare IPv6 规则
+# 直接使用固定的内部 ID (block_cf_ipv6) 以防重复创建
+uci set firewall.block_cf_ipv6=rule
+uci set firewall.block_cf_ipv6.name='Block Cloudflare IPv6'
+uci set firewall.block_cf_ipv6.src='lan'
+uci set firewall.block_cf_ipv6.dest='wan'
+uci set firewall.block_cf_ipv6.proto='all'
+uci set firewall.block_cf_ipv6.family='ipv6'
+uci set firewall.block_cf_ipv6.target='REJECT'
+
+# 因为有多个目标 IP，所以我们清空旧的（如果有），并依次添加列表项
+uci delete firewall.block_cf_ipv6.dest_ip 2>/dev/null
+uci add_list firewall.block_cf_ipv6.dest_ip='2400:cb00::/32'
+uci add_list firewall.block_cf_ipv6.dest_ip='2606:4700::/32'
+uci add_list firewall.block_cf_ipv6.dest_ip='2803:f800::/32'
+uci add_list firewall.block_cf_ipv6.dest_ip='2405:b500::/32'
+uci add_list firewall.block_cf_ipv6.dest_ip='2405:8100::/32'
+uci add_list firewall.block_cf_ipv6.dest_ip='2a06:98c0::/29'
+uci add_list firewall.block_cf_ipv6.dest_ip='2c0f:f248::/32'
+uci add_list firewall.block_cf_ipv6.dest_ip='2a01:4f8::/29'
+
+# 5. 提交并应用
+uci commit firewall
+
+# 其他
+uci delete network.globals.ula_prefix
+uci set dhcp.@dnsmasq[0].min_cache_ttl='600'
+uci add_list dhcp.@dnsmasq[0].address='/appsflyer.com/#'
+uci add_list dhcp.@dnsmasq[0].address='/bugly.qq.com/#'
+uci add_list dhcp.@dnsmasq[0].address='/chat.bilibili.com/#'
+uci add_list dhcp.@dnsmasq[0].address='/mountaintoys.cn/#'
+uci add_list dhcp.@dnsmasq[0].address='/graph.facebook.com/#'
+uci add_list dhcp.@dnsmasq[0].address='/mcdn.bilivideo.cn/#'
+uci add_list dhcp.@dnsmasq[0].address='/mcdn.bilivideo.com/#'
+uci add_list dhcp.@dnsmasq[0].address='/skk.moe/#'
+uci add_list dhcp.@dnsmasq[0].address='/smtcdns.net/#'
+uci add_list dhcp.@dnsmasq[0].address='/sukkaw.com/#'
+uci add_list dhcp.@dnsmasq[0].address='/szbdyd.com/#'
 uci commit
-
-# 设置编译作者信息
-FILE_PATH="/etc/openwrt_release"
-NEW_DESCRIPTION="Packaged by wukongdaily"
-sed -i "s/DISTRIB_DESCRIPTION='[^']*'/DISTRIB_DESCRIPTION='$NEW_DESCRIPTION'/" "$FILE_PATH"
-
-# 若luci-app-advancedplus (进阶设置)已安装 则去除zsh的调用 防止命令行报 /usb/bin/zsh: not found的提示
-if [ -f /usr/lib/lua/luci/controller/advancedplus.lua ]; then
-    sed -i '/\/usr\/bin\/zsh/d' /etc/profile
-    sed -i '/\/bin\/zsh/d' /etc/init.d/advancedplus
-    sed -i '/\/usr\/bin\/zsh/d' /etc/init.d/advancedplus
-    echo "fix ttyd show msg: /usb/bin/zsh: not found" >>$LOGFILE
-fi
-
-# 只有安装了 luci-app-quickfile 才执行
-if [ -f /usr/bin/quickfile ]; then
-    uci set nginx.global.uci_enable='true'
-    uci del nginx._lan 2>/dev/null
-    uci del nginx._redirect2ssl 2>/dev/null
-
-    uci add nginx server
-    uci rename nginx.@server[-1]='_lan'
-
-    uci set nginx._lan.server_name='_lan'
-    uci add_list nginx._lan.listen='80 default_server'
-    uci add_list nginx._lan.listen='[::]:80 default_server'
-    uci add_list nginx._lan.include='conf.d/*.locations'
-    uci set nginx._lan.access_log='off; # logd openwrt'
-
-    uci commit nginx
-    echo "fix quickfile nginx config" >>$LOGFILE
-fi
-
-# 若安装了dockerd 则设置docker的防火墙规则
-# 扩大docker涵盖的子网范围 '172.16.0.0/12'
-# 方便各类docker容器的端口顺利通过防火墙 
-if command -v dockerd >/dev/null 2>&1; then
-    echo "检测到 Docker，正在配置防火墙规则..."
-    FW_FILE="/etc/config/firewall"
-
-    # 删除所有名为 docker 的 zone
-    uci delete firewall.docker
-
-    # 先获取所有 forwarding 索引，倒序排列删除
-    for idx in $(uci show firewall | grep "=forwarding" | cut -d[ -f2 | cut -d] -f1 | sort -rn); do
-        src=$(uci get firewall.@forwarding[$idx].src 2>/dev/null)
-        dest=$(uci get firewall.@forwarding[$idx].dest 2>/dev/null)
-        echo "Checking forwarding index $idx: src=$src dest=$dest"
-        if [ "$src" = "docker" ] || [ "$dest" = "docker" ]; then
-            echo "Deleting forwarding @forwarding[$idx]"
-            uci delete firewall.@forwarding[$idx]
-        fi
-    done
-    # 提交删除
-    uci commit firewall
-
-# 追加新的 zone + forwarding 配置
-cat <<EOF >>"$FW_FILE"
-
-config zone 'docker'
-  option input 'ACCEPT'
-  option output 'ACCEPT'
-  option forward 'ACCEPT'
-  option name 'docker'
-  list subnet '172.16.0.0/12'
-
-config forwarding
-  option src 'docker'
-  option dest 'lan'
-
-config forwarding
-  option src 'docker'
-  option dest 'wan'
-
-config forwarding
-  option src 'lan'
-  option dest 'docker'
-EOF
-
-else
-    echo "未检测到 Docker，跳过防火墙配置。"
-fi
 
 exit 0
