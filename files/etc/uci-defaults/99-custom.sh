@@ -143,28 +143,42 @@ if [ -n "$idx" ]; then
     uci del_list firewall.@rule[$idx].icmp_type='echo-request'
 fi
 
-# 4. 创建 Block Cloudflare IPv6 规则
-# 直接使用固定的内部 ID (block_cf_ipv6) 以防重复创建
-uci set firewall.block_cf_ipv6=rule
-uci set firewall.block_cf_ipv6.name='Block Cloudflare IPv6'
-uci set firewall.block_cf_ipv6.src='lan'
-uci set firewall.block_cf_ipv6.dest='wan'
-uci set firewall.block_cf_ipv6.proto='all'
-uci set firewall.block_cf_ipv6.family='ipv6'
-uci set firewall.block_cf_ipv6.target='REJECT'
+# 4. 创建 Reject IP 规则
+# 直接使用固定的内部 ID (reject_ip) 以防重复创建
+uci set firewall.reject_ip=rule
+uci set firewall.reject_ip.name='Reject IP'
+uci set firewall.reject_ip.proto='all'
+uci set firewall.reject_ip.src='lan'
+uci set firewall.reject_ip.dest='wan'
+uci set firewall.reject_ip.target='REJECT'
 
 # 因为有多个目标 IP，所以我们清空旧的（如果有），并依次添加列表项
-uci delete firewall.block_cf_ipv6.dest_ip 2>/dev/null
-uci add_list firewall.block_cf_ipv6.dest_ip='2400:cb00::/32'
-uci add_list firewall.block_cf_ipv6.dest_ip='2606:4700::/32'
-uci add_list firewall.block_cf_ipv6.dest_ip='2803:f800::/32'
-uci add_list firewall.block_cf_ipv6.dest_ip='2405:b500::/32'
-uci add_list firewall.block_cf_ipv6.dest_ip='2405:8100::/32'
-uci add_list firewall.block_cf_ipv6.dest_ip='2a06:98c0::/29'
-uci add_list firewall.block_cf_ipv6.dest_ip='2c0f:f248::/32'
-uci add_list firewall.block_cf_ipv6.dest_ip='2a01:4f8::/29'
+uci delete firewall.reject_ip.dest_ip 2>/dev/null
+uci add_list firewall.reject_ip.dest_ip='203.119.204.80'
+uci add_list firewall.reject_ip.dest_ip='203.119.206.8'
+uci add_list firewall.reject_ip.dest_ip='203.119.206.9'
+uci add_list firewall.reject_ip.dest_ip='203.119.238.194'
+uci add_list firewall.reject_ip.dest_ip='203.119.238.240'
+uci add_list firewall.reject_ip.dest_ip='2400:cb00::/32'
+uci add_list firewall.reject_ip.dest_ip='2606:4700::/32'
+uci add_list firewall.reject_ip.dest_ip='2803:f800::/32'
+uci add_list firewall.reject_ip.dest_ip='2405:b500::/32'
+uci add_list firewall.reject_ip.dest_ip='2405:8100::/32'
+uci add_list firewall.reject_ip.dest_ip='2a06:98c0::/29'
+uci add_list firewall.reject_ip.dest_ip='2c0f:f248::/32'
+uci add_list firewall.reject_ip.dest_ip='2a01:4f8::/29'
 
-# 5. 提交并应用
+# 5. 创建 bilibili 规则
+# 直接使用固定的内部 ID (bilibili) 以防重复创建
+uci set firewall.bilibili=rule
+uci set firewall.bilibili.name='bilibili'
+uci set firewall.bilibili.proto='tcp'
+uci set firewall.bilibili.src='lan'
+uci set firewall.bilibili.dest='wan'
+uci set firewall.bilibili.dest_port='8000'
+uci set firewall.bilibili.target='REJECT'
+
+# 6. 提交并应用
 uci commit firewall
 
 # 其他
@@ -175,12 +189,15 @@ uci add_list dhcp.@dnsmasq[0].address='/bugly.qq.com/#'
 uci add_list dhcp.@dnsmasq[0].address='/chat.bilibili.com/#'
 uci add_list dhcp.@dnsmasq[0].address='/mountaintoys.cn/#'
 uci add_list dhcp.@dnsmasq[0].address='/graph.facebook.com/#'
+uci add_list dhcp.@dnsmasq[0].address='/httpdns.bilivideo.com/#'
 uci add_list dhcp.@dnsmasq[0].address='/mcdn.bilivideo.cn/#'
 uci add_list dhcp.@dnsmasq[0].address='/mcdn.bilivideo.com/#'
+uci add_list dhcp.@dnsmasq[0].address='/nexitech.cn/#'
 uci add_list dhcp.@dnsmasq[0].address='/skk.moe/#'
 uci add_list dhcp.@dnsmasq[0].address='/smtcdns.net/#'
 uci add_list dhcp.@dnsmasq[0].address='/sukkaw.com/#'
 uci add_list dhcp.@dnsmasq[0].address='/szbdyd.com/#'
+uci add_list dhcp.@dnsmasq[0].address='/yirujs.com/#'
 uci commit
 
 exit 0
