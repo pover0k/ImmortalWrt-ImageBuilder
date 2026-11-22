@@ -154,6 +154,18 @@ uci set firewall.reject_ip.target='REJECT'
 
 # 因为有多个目标 IP，所以我们清空旧的（如果有），并依次添加列表项
 uci delete firewall.reject_ip.dest_ip 2>/dev/null
+uci add_list firewall.reject_ip.dest_ip='101.91.140.124'
+uci add_list firewall.reject_ip.dest_ip='101.91.140.224'
+uci add_list firewall.reject_ip.dest_ip='112.64.218.119'
+uci add_list firewall.reject_ip.dest_ip='112.65.200.117'
+uci add_list firewall.reject_ip.dest_ip='114.116.215.110'
+uci add_list firewall.reject_ip.dest_ip='116.63.10.31'
+uci add_list firewall.reject_ip.dest_ip='116.63.10.135'
+uci add_list firewall.reject_ip.dest_ip='117.144.238.29'
+uci add_list firewall.reject_ip.dest_ip='117.185.228.108'
+uci add_list firewall.reject_ip.dest_ip='122.9.7.134'
+uci add_list firewall.reject_ip.dest_ip='122.9.13.79'
+uci add_list firewall.reject_ip.dest_ip='122.9.15.129'
 uci add_list firewall.reject_ip.dest_ip='203.119.204.80'
 uci add_list firewall.reject_ip.dest_ip='203.119.206.8'
 uci add_list firewall.reject_ip.dest_ip='203.119.206.9'
@@ -175,8 +187,9 @@ uci set firewall.bilibili.name='bilibili'
 uci set firewall.bilibili.proto='tcp'
 uci set firewall.bilibili.src='lan'
 uci set firewall.bilibili.dest='wan'
-uci set firewall.bilibili.dest_port='8000'
+uci set firewall.bilibili.dest_port='8000 8082'
 uci set firewall.bilibili.target='REJECT'
+uci set firewall.bilibili.enabled='0'
 
 # 6. 提交并应用
 uci commit firewall
